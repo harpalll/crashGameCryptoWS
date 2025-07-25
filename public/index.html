@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Crypto Crash Game Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      .log-entry {
+        transition: background-color 0.5s ease;
+      }
+      .log-entry-new {
+        background-color: #3b82f620; /* A light blue flash */
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4"
+  >
+    <div class="w-full max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Left Panel: Controls & Wallet -->
+      <div
+        class="lg:col-span-1 bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col gap-6"
+      >
+        <div>
+          <h2 class="text-xl font-bold mb-2 text-blue-400">Connection</h2>
+          <div class="flex items-center gap-2">
+            <div
+              id="status-indicator"
+              class="w-3 h-3 rounded-full bg-red-500"
+            ></div>
+            <span id="status-text">Disconnected</span>
+          </div>
+          <div class="mt-4">
+            <label
+              for="playerId"
+              class="block text-sm font-medium text-gray-400"
+              >Player ID</label
+            >
+            <input
+              type="text"
+              id="playerId"
+              class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              placeholder="Enter your Player ID"
+            />
+            <button
+              id="connectBtn"
+              class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
+            >
+              Connect
+            </button>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-700 pt-6">
+          <h2 class="text-xl font-bold mb-2 text-blue-400">Wallet</h2>
+          <div id="wallet-info" class="text-gray-300">
+            Connect to see balance.
+          </div>
+        </div>
+
+        <div class="border-t border-gray-700 pt-6">
+          <h2 class="text-xl font-bold mb-2 text-blue-400">Place Bet</h2>
+          <form id="betForm" class="space-y-4">
+            <div>
+              <label
+                for="usdAmount"
+                class="block text-sm font-medium text-gray-400"
+                >Amount (USD)</label
+              >
+              <input
+                type="number"
+                id="usdAmount"
+                value="10"
+                min="1"
+                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                placeholder="10"
+              />
+            </div>
+            <div>
+              <label
+                for="currency"
+                class="block text-sm font-medium text-gray-400"
+                >Currency</label
+              >
+              <select
+                id="currency"
+                class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              >
+                <option>BTC</option>
+                <option>ETH</option>
+              </select>
+            </div>
+            <button
+              type="submit"
+              id="betBtn"
+              class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed"
+            >
+              Place Bet
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Right Panel: Game State & Logs -->
+      <div
+        class="lg:col-span-2 bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col"
+      >
+        <div class="text-center">
+          <h2 id="game-state" class="text-2xl font-bold text-blue-400 mb-2">
+            WAITING
+          </h2>
+          <div
+            id="multiplier"
+            class="text-7xl font-bold tracking-tighter text-white"
+          >
+            1.00x
+          </div>
+          <div id="timer" class="text-lg text-gray-400 h-6"></div>
+        </div>
+
+        <div class="mt-6 text-center">
+          <button
+            id="cashoutBtn"
+            class="w-full max-w-xs mx-auto bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-md transition duration-300 text-lg disabled:bg-gray-500 disabled:cursor-not-allowed"
+          >
+            Cash Out
+          </button>
+        </div>
+
+        <div class="mt-6 border-t border-gray-700 pt-6 flex-grow">
+          <h3 class="text-lg font-bold mb-2 text-blue-400">Event Log</h3>
+          <div
+            id="log"
+            class="bg-gray-900 h-64 p-3 rounded-md overflow-y-auto text-sm font-mono"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const statusIndicator = document.getElementById("status-indicator");
+      const statusText = document.getElementById("status-text");
+      const connectBtn = document.getElementById("connectBtn");
+      const playerIdInput = document.getElementById("playerId");
+      const walletInfo = document.getElementById("wallet-info");
+      const betForm = document.getElementById("betForm");
+      const betBtn = document.getElementById("betBtn");
+      const cashoutBtn = document.getElementById("cashoutBtn");
+      const gameStateEl = document.getElementById("game-state");
+      const multiplierEl = document.getElementById("multiplier");
+      const timerEl = document.getElementById("timer");
+      const logEl = document.getElementById("log");
+
+      let socket;
+      let countdownInterval;
+
+      function addLog(message, type = "info") {
+        const entry = document.createElement("div");
+        const time = new Date().toLocaleTimeString();
+        let colorClass = "text-gray-400";
+        if (type === "success") colorClass = "text-green-400";
+        if (type === "error") colorClass = "text-red-400";
+        if (type === "event") colorClass = "text-blue-400";
+
+        entry.innerHTML = `<span class="text-gray-500">${time}</span> <span class="${colorClass}">${message}</span>`;
+        entry.className = "log-entry";
+        logEl.appendChild(entry);
+        logEl.scrollTop = logEl.scrollHeight;
+
+        // Flash effect
+        entry.classList.add("log-entry-new");
+        setTimeout(() => entry.classList.remove("log-entry-new"), 500);
+      }
+
+      function updateWallet(walletData) {
+        let html = '<ul class="space-y-1">';
+        for (const currency in walletData.wallet) {
+          html += `<li>${currency}: ${parseFloat(
+            walletData.wallet[currency]
+          ).toFixed(8)}</li>`;
+        }
+        html += `<li class="font-bold pt-2 border-t border-gray-600">Total: $${walletData.totalUsdValue}</li>`;
+        html += "</ul>";
+        walletInfo.innerHTML = html;
+      }
+
+      function startCountdown(duration) {
+        clearInterval(countdownInterval);
+        let timeLeft = duration / 1000;
+        timerEl.textContent = `Next round in ${timeLeft}s`;
+        countdownInterval = setInterval(() => {
+          timeLeft--;
+          timerEl.textContent = `Next round in ${timeLeft}s`;
+          if (timeLeft <= 0) clearInterval(countdownInterval);
+        }, 1000);
+      }
+
+      function connect() {
+        const playerId = playerIdInput.value.trim();
+        if (!playerId) {
+          addLog("Player ID cannot be empty.", "error");
+          return;
+        }
+
+        if (socket) {
+          socket.disconnect();
+        }
+
+        // Connect to the server, passing playerId as a query parameter
+        socket = io("http://localhost:3000", {
+          query: { playerId },
+        });
+
+        socket.on("connect", () => {
+          statusIndicator.classList.remove("bg-red-500");
+          statusIndicator.classList.add("bg-green-500");
+          statusText.textContent = `Connected as ${playerId}`;
+          addLog(`Connected to server as ${playerId}`, "success");
+          connectBtn.textContent = "Disconnect";
+        });
+
+        socket.on("disconnect", () => {
+          statusIndicator.classList.remove("bg-green-500");
+          statusIndicator.classList.add("bg-red-500");
+          statusText.textContent = "Disconnected";
+          addLog("Disconnected from server.", "error");
+          betBtn.disabled = true;
+          cashoutBtn.disabled = true;
+          connectBtn.textContent = "Connect";
+        });
+
+        // Game State Events
+        socket.on("game:state", (data) => {
+          gameStateEl.textContent = data.state;
+          addLog(`Game state changed to ${data.state}`, "event");
+          switch (data.state) {
+            case "BETTING":
+              betBtn.disabled = false;
+              cashoutBtn.disabled = true;
+              multiplierEl.textContent = "1.00x";
+              multiplierEl.classList.remove("text-red-500");
+              startCountdown(data.duration);
+              break;
+            case "IN_PROGRESS":
+              betBtn.disabled = true;
+              cashoutBtn.disabled = false;
+              timerEl.textContent = "";
+              break;
+            case "CRASHED":
+            case "WAITING":
+              betBtn.disabled = true;
+              cashoutBtn.disabled = true;
+              if (data.duration) startCountdown(data.duration);
+              break;
+          }
+        });
+
+        socket.on("multiplier:update", (data) => {
+          multiplierEl.textContent = `${data.multiplier}x`;
+        });
+
+        socket.on("game:crash", (data) => {
+          multiplierEl.textContent = `${data.crashPoint}x`;
+          multiplierEl.classList.add("text-red-500");
+          addLog(
+            `Round crashed at ${data.crashPoint}x. Seed: ${data.serverSeed}`,
+            "event"
+          );
+        });
+
+        // Player-specific events
+        socket.on("player:bet_success", (data) =>
+          addLog(data.message, "success")
+        );
+        socket.on("player:cashed_out_success", (data) => {
+          addLog(
+            `Cashed out at ${data.cashOutMultiplier}x for $${parseFloat(
+              data.winningsUsd
+            ).toFixed(2)}!`,
+            "success"
+          );
+          cashoutBtn.disabled = true;
+        });
+
+        // Global events
+        socket.on("player:bet_placed", (data) =>
+          addLog(`${data.playerId} bet $${data.usdAmount}`, "info")
+        );
+        socket.on("player:cashed_out", (data) =>
+          addLog(
+            `${data.playerId} cashed out at ${data.cashOutMultiplier}x`,
+            "info"
+          )
+        );
+
+        // Error Events
+        socket.on("error:bet", (data) =>
+          addLog(`Bet Error: ${data.message}`, "error")
+        );
+        socket.on("error:cashout", (data) =>
+          addLog(`Cashout Error: ${data.message}`, "error")
+        );
+      }
+
+      connectBtn.addEventListener("click", () => {
+        if (socket && socket.connected) {
+          socket.disconnect();
+        } else {
+          connect();
+        }
+      });
+
+      betForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (!socket || !socket.connected) {
+          addLog("Not connected to server.", "error");
+          return;
+        }
+        const usdAmount = parseFloat(
+          document.getElementById("usdAmount").value
+        );
+        const currency = document.getElementById("currency").value;
+        if (usdAmount <= 0) {
+          addLog("Bet amount must be positive.", "error");
+          return;
+        }
+        socket.emit("player:bet", { usdAmount, currency });
+      });
+
+      cashoutBtn.addEventListener("click", () => {
+        if (!socket || !socket.connected) {
+          addLog("Not connected to server.", "error");
+          return;
+        }
+        socket.emit("player:cashout");
+      });
+
+      // Initial state
+      betBtn.disabled = true;
+      cashoutBtn.disabled = true;
+    </script>
+  </body>
+</html>
