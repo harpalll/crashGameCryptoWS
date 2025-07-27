@@ -20,6 +20,8 @@ export const sendWallet = async (socket) => {
   try {
     // if socket.playerId is not reaching here then send playerId from server.js
     const wallet = await getWalletForPlayer(socket.playerId);
+    console.log(`Getting wallet: ${wallet}`);
+
     if (wallet) {
       socket.emit("player:wallet", wallet);
     } else {

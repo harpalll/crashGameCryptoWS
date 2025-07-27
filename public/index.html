@@ -597,6 +597,7 @@
         });
 
         socket.on("player:wallet", (data) => {
+          console.log("player:wallet called");
           updateWallet(data);
         });
 
