@@ -5,7 +5,7 @@ const SUPPORTED_CURRENCIES = {
   BTC: "bitcoin",
   ETH: "ethereum",
 };
-const CACHE_DURATION = 10000; // 10 seconds in ms
+const CACHE_DURATION = 10000; // 10s
 
 const priceCache = {};
 
@@ -14,7 +14,7 @@ class CryptoService {
     const now = Date.now();
     const currencyIds = Object.values(SUPPORTED_CURRENCIES).join(",");
 
-    // Check if a valid cache exists for all currencies
+    // ✅ Use cache if valid
     const areAllCached = Object.keys(SUPPORTED_CURRENCIES).every(
       (symbol) =>
         priceCache[symbol] &&
@@ -29,42 +29,66 @@ class CryptoService {
       return prices;
     }
 
-    // Fetch from API if cache is stale or non-existent
+    // 🔁 Fetch from CoinGecko
     try {
       const response = await axios.get(COINGECKO_API_URL, {
         params: {
           ids: currencyIds,
           vs_currencies: "usd",
         },
-        timeout: 5000, // 5-second timeout
+        timeout: 5000,
       });
 
       const prices = {};
       for (const symbol in SUPPORTED_CURRENCIES) {
         const id = SUPPORTED_CURRENCIES[symbol];
-        if (response.data[id]) {
-          prices[symbol] = response.data[id].usd;
-          // Update cache
+        const price = response.data?.[id]?.usd;
+
+        if (price) {
+          prices[symbol] = price;
           priceCache[symbol] = {
-            price: prices[symbol],
+            price,
             lastFetch: now,
           };
+        } else {
+          throw new Error(`Missing price for ${id}`);
         }
       }
 
-      console.log(prices);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("💸 Live Prices:", prices);
+      }
+
       return prices;
     } catch (error) {
-      console.error("Error fetching crypto prices from API:", error.message);
-      // On failure, fallback to the last known prices if available
+      console.error("❌ Error fetching crypto prices from API:");
+      if (error.response) {
+        console.error("Status:", error.response.status);
+        console.error("Body:", error.response.data);
+      } else {
+        console.error("Message:", error.message);
+      }
+
+      // 🔁 Fallback to cached prices
       const fallbackPrices = {};
       for (const symbol in priceCache) {
         fallbackPrices[symbol] = priceCache[symbol].price;
       }
+
       if (Object.keys(fallbackPrices).length > 0) {
-        console.log("Using stale cache as fallback.");
+        console.warn("⚠️ Using stale cached prices.");
         return fallbackPrices;
       }
+
+      // ⚠️ Final fallback: hardcoded prices (for demo/stability)
+      if (process.env.NODE_ENV === "production") {
+        console.warn("⚠️ Using hardcoded fallback prices.");
+        return {
+          BTC: 60000,
+          ETH: 3500,
+        };
+      }
+
       throw new Error("Could not fetch cryptocurrency prices.");
     }
   }
@@ -76,10 +100,8 @@ class CryptoService {
     if (usdAmount <= 0) {
       throw new Error("USD amount must be positive.");
     }
-    const price = prices[currencySymbol];
-    return usdAmount / price;
+    return usdAmount / prices[currencySymbol];
   }
 }
 
-// Export a singleton instance of the service
 export default new CryptoService();
