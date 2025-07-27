@@ -11,6 +11,7 @@ const GAME_STATE = {
 
 const BETTING_DURATION = 10000;
 const WAITING_DURATION = 5000;
+const maxRoundDuration = 60000; // 60 seconds
 
 class GameService {
   constructor(io) {
@@ -22,7 +23,7 @@ class GameService {
     this.crashPoint = null;
     this.multiplier = 1.0;
     this.startTime = null;
-    this.bets = new Map(); // Use a Map to store bets by playerId for easy lookup
+    this.bets = new Map();
 
     this._gameLoop();
   }
@@ -117,13 +118,12 @@ class GameService {
         }
       }, 100);
 
-      // Force crash after 10 seconds if crashPoint hasn't been reached
       const forceCrash = setTimeout(() => {
         clearInterval(interval);
         this.crashPoint = this.multiplier;
-        console.log("--- Forced crash at 10s timeout ---");
+        console.log("--- Forced crash at 60s timeout ---");
         resolve();
-      }, 10000); // 10 seconds max duration
+      }, 60000); // 60 seconds
     });
   }
 
