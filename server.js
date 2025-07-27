@@ -11,8 +11,7 @@ import { sendWallet } from "./src/utils/getWalletForPlayer.js";
 import cors from "cors";
 
 dotenv.config();
-
-await connectDB();
+await connectDB().then(() => console.log("connected to mongo"));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
