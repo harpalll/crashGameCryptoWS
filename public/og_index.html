@@ -185,7 +185,9 @@
 
       async function fetchPlayers() {
         try {
-          const res = await fetch("http://localhost:3000/api/players");
+          const res = await fetch(
+            "https://crashgamecryptows.onrender.com/api/players"
+          );
           const data = await res.json();
           if (!data.success || !data.players.length) {
             throw new Error("No players found.");
@@ -273,7 +275,7 @@
         }
 
         // Connect to the server, passing playerId as a query parameter
-        socket = io("http://localhost:3000", {
+        socket = io("https://crashgamecryptows.onrender.com", {
           query: { playerId },
         });
 

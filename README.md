@@ -67,8 +67,8 @@ node src/seed.js
 npm start
 ```
 
-Server: `http://localhost:3000`  
-WebSocket endpoint: `ws://localhost:3000`
+Server: `https://crashgamecryptows.onrender.com/`  
+WebSocket endpoint: `ws://crashgamecryptows.onrender.com/`
 
 ---
 
@@ -79,7 +79,7 @@ WebSocket endpoint: `ws://localhost:3000`
 Returns game state + wallet balance.
 
 ```bash
-curl http://localhost:3000/api/game-state/<playerId>
+curl https://crashgamecryptows.onrender.com/api/game-state/<playerId>
 ```
 
 ---
