@@ -12,15 +12,15 @@ const GAME_STATE = {
 const BETTING_DURATION = 10000;
 const WAITING_DURATION = 5000;
 const maxRoundDuration = 60000; // 60 seconds
-const roundId = await GameRound.findOne()
-  .sort({ roundId: -1 })
-  .select("roundId");
+// const roundId = await GameRound.findOne()
+//   .sort({ roundId: -1 })
+//   .select("roundId");
 
 class GameService {
   constructor(io) {
     this.io = io;
     this.state = GAME_STATE.WAITING;
-    this.roundId = roundId;
+    this.roundId = 0;
     this.serverSeed = null;
     this.publicHash = null;
     this.crashPoint = null;
