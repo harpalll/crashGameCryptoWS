@@ -18,7 +18,7 @@ const betSchema = new mongoose.Schema(
 
 const gameRoundSchema = new mongoose.Schema(
   {
-    roundId: { type: String, required: true, unique: true, index: true },
+    roundId: { type: Number, required: true, unique: true, index: true },
     serverSeed: { type: String, required: true },
     publicHash: { type: String, required: true },
     crashPoint: { type: Number, required: true },

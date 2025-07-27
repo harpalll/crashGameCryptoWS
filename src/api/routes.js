@@ -1,9 +1,24 @@
 import { Router } from "express";
 import walletService from "../services/walletService.js";
+import Player from "../models/Player.js";
 
 // --- API Endpoints ---
 export default function createRoutes(gameService) {
   const router = Router();
+
+  router.get("/players", async (req, res, next) => {
+    try {
+      const players = await Player.find();
+
+      res.status(200).json({
+        success: true,
+        message: "Players fetched successfully.",
+        players,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   /**
    * @route   POST /api/bet
@@ -24,12 +39,10 @@ export default function createRoutes(gameService) {
       // Note: This is now being handled via WebSockets for real-time interaction
       await gameService.handleBetPlacement(playerId, usdAmount, currency);
 
-      res
-        .status(200)
-        .json({
-          success: true,
-          message: "Bet received and is being processed.",
-        });
+      res.status(200).json({
+        success: true,
+        message: "Bet received and is being processed.",
+      });
     } catch (error) {
       next(error);
     }

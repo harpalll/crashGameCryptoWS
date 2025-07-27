@@ -16,6 +16,8 @@ class WalletService {
       }
 
       const prices = await cryptoService.getPrices();
+      console.log(`Prices from CryptoService: ${prices}`);
+
       const cryptoAmount = cryptoService.convertUsdToCrypto(
         usdAmount,
         currency,
@@ -28,7 +30,13 @@ class WalletService {
       }
 
       // 1. Deduct from wallet
+      console.log("Wallet before deduction:", player.wallet);
       player.wallet[currency] -= cryptoAmount;
+      // console.log(
+      //   `Deducted ${cryptoAmount} from Wallet curr: ${player.wallet[currency]} `
+      // );
+      console.log("Wallet after deduction:", player.wallet);
+
       await player.save({ session });
 
       // 2. Create transaction record
@@ -68,6 +76,7 @@ class WalletService {
       }
 
       const winningsCrypto = bet.betAmountCrypto * multiplier;
+      console.log(`WinningCrypto : ${winningsCrypto}`);
 
       const prices = await cryptoService.getPrices();
       const winningsUsd = winningsCrypto * prices[bet.currency];
@@ -76,7 +85,14 @@ class WalletService {
       if (!player.wallet[bet.currency]) {
         player.wallet[bet.currency] = 0;
       }
+
+      console.log("Wallet before payout:", player.wallet);
       player.wallet[bet.currency] += winningsCrypto;
+      // console.log(
+      //   `Added ${winningsCrypto} to wallet curr: ${player.wallet[bet.currency]}`
+      // );
+      console.log("Wallet after payout:", player.wallet);
+
       await player.save({ session });
 
       // 2. Create transaction record

@@ -38,7 +38,8 @@ class GameService {
       await this._sleep(BETTING_DURATION);
 
       this.state = GAME_STATE.IN_PROGRESS;
-      this._startRound();
+      console.log("--- Starting Round ---");
+      await this._startRound();
       this.io.emit("game:state", {
         state: this.state,
         roundId: this.roundId,
@@ -64,8 +65,14 @@ class GameService {
     }
   }
 
-  _startRound() {
-    this.roundId++;
+  async _startRound() {
+    console.log("game round started");
+
+    // this.roundId++;
+    this.roundId = await this._getNextRoundId();
+
+    console.log(`RoundId: ${this.roundId}`);
+
     this.serverSeed = crypto.randomBytes(32).toString("hex");
     this.publicHash = crypto
       .createHash("sha256")
@@ -76,18 +83,47 @@ class GameService {
     this.startTime = Date.now();
   }
 
+  async _getNextRoundId() {
+    const lastRound = await GameRound.findOne().sort({ roundId: -1 });
+    return lastRound ? lastRound.roundId + 1 : 1;
+  }
+
+  // _runMultiplier() {
+  //   return new Promise((resolve) => {
+  //     const interval = setInterval(() => {
+  //       const elapsed = Date.now() - this.startTime;
+  //       this.multiplier = Math.pow(1.00006, elapsed).toFixed(2);
+  //       if (this.multiplier >= this.crashPoint) {
+  //         clearInterval(interval);
+  //         resolve();
+  //       } else {
+  //         this.io.emit("multiplier:update", { multiplier: this.multiplier });
+  //       }
+  //     }, 100);
+  //   });
+  // }
   _runMultiplier() {
     return new Promise((resolve) => {
       const interval = setInterval(() => {
         const elapsed = Date.now() - this.startTime;
         this.multiplier = Math.pow(1.00006, elapsed).toFixed(2);
+
         if (this.multiplier >= this.crashPoint) {
           clearInterval(interval);
+          clearTimeout(forceCrash);
           resolve();
         } else {
           this.io.emit("multiplier:update", { multiplier: this.multiplier });
         }
       }, 100);
+
+      // Force crash after 10 seconds if crashPoint hasn't been reached
+      const forceCrash = setTimeout(() => {
+        clearInterval(interval);
+        this.crashPoint = this.multiplier;
+        console.log("--- Forced crash at 10s timeout ---");
+        resolve();
+      }, 10000); // 10 seconds max duration
     });
   }
 
@@ -128,6 +164,8 @@ class GameService {
       usdAmount,
       currency
     );
+
+    console.log(`CryptoAmount: ${cryptoAmount}`);
 
     this.bets.set(playerId, {
       playerId,

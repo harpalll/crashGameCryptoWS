@@ -39,7 +39,7 @@
             ></div>
             <span id="status-text">Disconnected</span>
           </div>
-          <div class="mt-4">
+          <!-- <div class="mt-4">
             <label
               for="playerId"
               class="block text-sm font-medium text-gray-400"
@@ -51,6 +51,25 @@
               class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               placeholder="Enter your Player ID"
             />
+            <button
+              id="connectBtn"
+              class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
+            >
+              Connect
+            </button>
+          </div> -->
+          <div class="mt-4">
+            <label
+              for="playerSelect"
+              class="block text-sm font-medium text-gray-400"
+              >Select Player</label
+            >
+            <select
+              id="playerSelect"
+              class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm animate-pulse"
+            >
+              <option value="">Loading players...</option>
+            </select>
             <button
               id="connectBtn"
               class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
@@ -150,7 +169,7 @@
       const statusIndicator = document.getElementById("status-indicator");
       const statusText = document.getElementById("status-text");
       const connectBtn = document.getElementById("connectBtn");
-      const playerIdInput = document.getElementById("playerId");
+      // const playerIdInput = document.getElementById("playerId");
       const walletInfo = document.getElementById("wallet-info");
       const betForm = document.getElementById("betForm");
       const betBtn = document.getElementById("betBtn");
@@ -159,6 +178,36 @@
       const multiplierEl = document.getElementById("multiplier");
       const timerEl = document.getElementById("timer");
       const logEl = document.getElementById("log");
+
+      const playerSelect = document.getElementById("playerSelect");
+      let selectedPlayerId = null;
+      const playerMap = {}; // store _id -> username
+
+      async function fetchPlayers() {
+        try {
+          const res = await fetch("http://localhost:3000/api/players");
+          const data = await res.json();
+          if (!data.success || !data.players.length) {
+            throw new Error("No players found.");
+          }
+
+          playerSelect.innerHTML = ``;
+
+          data.players.forEach((player) => {
+            const option = document.createElement("option");
+            option.value = player._id;
+            option.textContent = player.username;
+            playerMap[player._id] = player.username;
+            playerSelect.classList.remove("animate-pulse");
+            playerSelect.appendChild(option);
+          });
+        } catch (err) {
+          console.error("Failed to fetch players:", err.message);
+          playerSelect.innerHTML = `<option value="">Error loading players</option>`;
+        }
+      }
+
+      fetchPlayers();
 
       let socket;
       let countdownInterval;
@@ -182,14 +231,16 @@
       }
 
       function updateWallet(walletData) {
+        walletInfo.innerHTML = `<div class="h-4 w-1/2 bg-gray-700 animate-pulse rounded"></div>`;
+
         let html = '<ul class="space-y-1">';
-        for (const currency in walletData.wallet) {
-          html += `<li>${currency}: ${parseFloat(
-            walletData.wallet[currency]
-          ).toFixed(8)}</li>`;
+        for (const currency in walletData) {
+          html += `<li>${currency}: ${parseFloat(walletData[currency]).toFixed(
+            8
+          )}</li>`;
         }
-        html += `<li class="font-bold pt-2 border-t border-gray-600">Total: $${walletData.totalUsdValue}</li>`;
-        html += "</ul>";
+        // html += `<li class="font-bold pt-2 border-t border-gray-600">Total: $${walletData.totalUsdValue}</li>`;
+        // html += "</ul>";
         walletInfo.innerHTML = html;
       }
 
@@ -205,9 +256,15 @@
       }
 
       function connect() {
-        const playerId = playerIdInput.value.trim();
+        connectBtn.disabled = true;
+        connectBtn.classList.add = "animate-pulse";
+        connectBtn.textContent = "Connecting...";
+
+        const playerId = playerSelect.value;
+        const username = playerSelect.textContent;
+
         if (!playerId) {
-          addLog("Player ID cannot be empty.", "error");
+          addLog("Select a player before connecting.", "error");
           return;
         }
 
@@ -220,15 +277,33 @@
           query: { playerId },
         });
 
+        socket.on("player:wallet", (data) => {
+          console.log("player:wallet called");
+          updateWallet(data);
+        });
+
         socket.on("connect", () => {
+          socket.emit("player:wallet");
+          connectBtn.disabled = false;
+          playerSelect.disabled = true;
+
+          connectBtn.classList.remove = "animate-pulse";
+          connectBtn.textContent = "Disconnect";
+
           statusIndicator.classList.remove("bg-red-500");
           statusIndicator.classList.add("bg-green-500");
-          statusText.textContent = `Connected as ${playerId}`;
+          statusText.textContent = `Connected as ${username} - ${playerId}`;
           addLog(`Connected to server as ${playerId}`, "success");
           connectBtn.textContent = "Disconnect";
         });
 
         socket.on("disconnect", () => {
+          connectBtn.disabled = false;
+          playerSelect.disabled = false;
+
+          connectBtn.classList.remove = "animate-pulse";
+          connectBtn.textContent = "connect";
+
           statusIndicator.classList.remove("bg-green-500");
           statusIndicator.classList.add("bg-red-500");
           statusText.textContent = "Disconnected";
@@ -244,6 +319,8 @@
           addLog(`Game state changed to ${data.state}`, "event");
           switch (data.state) {
             case "BETTING":
+              console.log("Betting started");
+
               betBtn.disabled = false;
               cashoutBtn.disabled = true;
               multiplierEl.textContent = "1.00x";
@@ -251,12 +328,15 @@
               startCountdown(data.duration);
               break;
             case "IN_PROGRESS":
+              console.log("IN Progress");
               betBtn.disabled = true;
               cashoutBtn.disabled = false;
               timerEl.textContent = "";
               break;
             case "CRASHED":
+              console.log("Crashed");
             case "WAITING":
+              console.log("Waiting state");
               betBtn.disabled = true;
               cashoutBtn.disabled = true;
               if (data.duration) startCountdown(data.duration);
@@ -278,9 +358,11 @@
         });
 
         // Player-specific events
-        socket.on("player:bet_success", (data) =>
-          addLog(data.message, "success")
-        );
+        socket.on("player:bet_success", (data) => {
+          addLog(data.message, "success");
+          socket.emit("player:wallet");
+        });
+
         socket.on("player:cashed_out_success", (data) => {
           addLog(
             `Cashed out at ${data.cashOutMultiplier}x for $${parseFloat(
@@ -289,12 +371,14 @@
             "success"
           );
           cashoutBtn.disabled = true;
+          socket.emit("player:wallet");
         });
 
         // Global events
-        socket.on("player:bet_placed", (data) =>
-          addLog(`${data.playerId} bet $${data.usdAmount}`, "info")
-        );
+        socket.on("player:bet_placed", (data) => {
+          addLog(`${data.username} bet $${data.usdAmount}`, "info");
+        });
+
         socket.on("player:cashed_out", (data) =>
           addLog(
             `${data.playerId} cashed out at ${data.cashOutMultiplier}x`,

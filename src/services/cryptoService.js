@@ -51,6 +51,8 @@ class CryptoService {
           };
         }
       }
+
+      console.log(prices);
       return prices;
     } catch (error) {
       console.error("Error fetching crypto prices from API:", error.message);

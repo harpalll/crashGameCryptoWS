@@ -7,6 +7,7 @@ import createRoutes from "./src/api/routes.js";
 import GameService from "./src/services/gameService.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import { sendWallet } from "./src/utils/getWalletForPlayer.js";
 
 dotenv.config();
 
@@ -36,19 +37,22 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Use the API routes
 app.use("/api", createRoutes(gameService)); // injecting game service
 
 // --- WebSocket Connection & Event Handling ---
 io.on("connection", (socket) => {
   console.log(`A user connected: ${socket.id}`);
 
-  // We'll use a query parameter for this simulation.
   const playerId = socket.handshake.query.playerId;
+  socket.playerId = playerId;
+  console.log(playerId);
+
   if (!playerId) {
     console.log(`Connection rejected: No playerId provided.`);
     return socket.disconnect();
   }
+
+  sendWallet(socket);
 
   // Join a private room for this player to send them specific notifications
   socket.join(playerId);
@@ -80,11 +84,14 @@ io.on("connection", (socket) => {
   socket.on("player:cashout", async () => {
     try {
       await gameService.handleCashOut(playerId);
-      // Success message is sent from within the game service to the player's room
     } catch (error) {
       console.error(`Cashout error for player ${playerId}:`, error.message);
       socket.emit("error:cashout", { message: error.message });
     }
+  });
+
+  socket.on("player:wallet", async () => {
+    sendWallet(socket);
   });
 
   socket.on("disconnect", () => {
